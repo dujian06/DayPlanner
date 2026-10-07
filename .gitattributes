@@ -1,0 +1,18 @@
+# 本仓库以 Windows 为主开发环境，但 CI 在 Linux 上构建。
+# gradlew 是 shell 脚本：若被转成 CRLF，Linux 会报
+#   /bin/sh^M: bad interpreter: No such file or directory
+# 因此对 wrapper 相关文件强制保持 LF，且声明为可执行脚本。
+gradlew            text eol=lf
+gradlew.bat        text eol=crlf
+gradle/wrapper/gradle-wrapper.jar  binary
+
+# 其余文本文件统一按 LF 存入仓库，检出时由下面的规则还原
+*.kt        text eol=lf
+*.kts       text eol=lf
+*.xml       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.properties text eol=lf
+*.pro       text eol=lf
+*.md        text eol=lf
+.gitignore  text eol=lf

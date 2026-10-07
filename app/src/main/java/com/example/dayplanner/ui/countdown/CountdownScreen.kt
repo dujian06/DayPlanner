@@ -20,9 +20,10 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SwipeToDismiss
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberDismissState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -104,16 +105,18 @@ fun CountdownScreen(viewModel: CountdownViewModel = hiltViewModel()) {
     }
 }
 
+// Material3 1.3.0（BOM 2024.09.00）已移除旧的 SwipeToDismiss / rememberDismissState /
+// DismissValue / DismissDirection，统一替换为 SwipeToDismissBox 系列 API。
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissItem(
     event: CountdownEvent,
     onDelete: () -> Unit
 ) {
-    val dismissState = rememberDismissState(
+    val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == androidx.compose.material3.DismissValue.DismissedToStart ||
-                value == androidx.compose.material3.DismissValue.DismissedToEnd
+            if (value == SwipeToDismissBoxValue.EndToStart ||
+                value == SwipeToDismissBoxValue.StartToEnd
             ) {
                 onDelete()
                 true
@@ -121,22 +124,24 @@ private fun SwipeToDismissItem(
         }
     )
 
-    SwipeToDismiss(
+    SwipeToDismissBox(
         state = dismissState,
-        background = {
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
             Box(
                 Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xFFE53935))
                     .padding(horizontal = 20.dp),
-                contentAlignment = if (dismissState.dismissDirection == androidx.compose.material3.DismissDirection.EndToStart)
+                contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart)
                     Alignment.CenterEnd else Alignment.CenterStart
             ) {
                 Icon(Icons.Default.Delete, contentDescription = "删除", tint = Color.White)
             }
         },
-        dismissContent = {
+        content = {
             val left = DateUtils.daysUntil(event.targetDate)
             Card(
                 Modifier.fillMaxWidth().padding(vertical = 4.dp),

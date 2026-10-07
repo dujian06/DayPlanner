@@ -4,6 +4,10 @@
 *.jar
 *.war
 
+# 但 Gradle Wrapper 是构建必需件，必须随仓库提交，
+# 否则 GitHub Actions 上没有 gradlew 可执行环境。
+!gradle/wrapper/gradle-wrapper.jar
+
 # Gradle files
 .gradle/
 build/

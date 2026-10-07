@@ -68,7 +68,22 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          set -uo pipefail
+          chmod +x ./gradlew
+          if ./gradlew assembleDebug --stacktrace; then
+            echo "构建方式：Gradle Wrapper"
+          else
+            echo "::warning::Wrapper 构建失败，回退为直接使用 Gradle 发行版"
+            GRADLE_VER=8.9
+            ZIP="gradle-${GRADLE_VER}-bin.zip"
+            mkdir -p "$HOME/gradle-dist" && cd "$HOME/gradle-dist"
+            curl -fsSL --retry 3 -o "$ZIP" \
+              "https://services.gradle.org/distributions/${ZIP}"
+            unzip -q -o "$ZIP"
+            chmod +x "gradle-${GRADLE_VER}/bin/gradle"
+            "gradle-${GRADLE_VER}/bin/gradle" assembleDebug --stacktrace
+          fi
 
       # 失败时把环境真相打出来，省去反复猜测日志的来回。
       - name: Diagnostics

@@ -25,12 +25,12 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq unzip
           export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
           mkdir -p $ANDROID_HOME/cmdline-tools
           curl -sS https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdline.zip
           unzip -q cmdline.zip -d $ANDROID_HOME/cmdline-tools
           mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses > /dev/null
           sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-34" "build-tools;34.0.0"
 

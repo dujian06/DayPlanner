@@ -20,24 +20,77 @@ jobs:
           distribution: "temurin"
           java-version: 17
 
-      # 官方 action 会自行设置 ANDROID_HOME / ANDROID_SDK_ROOT 并安装组件。
-      # 不要再手动 export PATH 或写 local.properties —— 多重注入会导致 Gradle 报
-      # "Please correct and use only one way to inject the SDK location"。
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      # 不使用 android-actions/setup-android：它默认会安装已被 Google 下架的
+      # legacy "tools" 包，导致 "Failed to find package 'tools'" 而整步失败。
+      # 改为直接复用 ubuntu 镜像预装的 Android SDK —— 环境变量已由镜像注入，
+      # 因此这里绝不再手动 export PATH、也不写 local.properties，
+      # 避免 Gradle 报 "Please correct and use only one way to inject the SDK location"。
+      - name: Locate Android SDK
+        id: sdk
+        shell: bash
+        run: |
+          for c in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Android/Sdk" "/usr/local/lib/android/sdk"; do
+            if [ -n "$c" ] && [ -d "$c" ]; then
+              echo "sdk_root=$c" >> "$GITHUB_OUTPUT"
+              echo "使用 Android SDK: $c"
+              break
+            fi
+          done
+          if ! grep -q 'sdk_root=' "$GITHUB_OUTPUT"; then
+            echo "::error::未找到 Android SDK 目录"
+            exit 1
+          fi
+
+      - name: Install SDK packages
+        shell: bash
+        run: |
+          set -uo pipefail
+          SDK='${{ steps.sdk.outputs.sdk_root }}'
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -name sdkmanager 2>/dev/null | head -n 1 || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::warning::镜像 SDK 内无 sdkmanager，改用 PATH 中的版本"
+            SDKMANAGER="$(command -v sdkmanager || true)"
+          fi
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::找不到 sdkmanager，无法安装 SDK 组件"
+            exit 1
+          fi
+          chmod +x "$SDKMANAGER" 2>/dev/null || true
+          echo "sdkmanager: $SDKMANAGER"
+          # 接受全部许可（已接受过的会被直接跳过）
+          yes 2>/dev/null | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          # 安装构建所需组件；若镜像已预装则此步无实际影响
+          if ! "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"; then
+            echo "::warning::部分组件安装失败，若镜像已预装则不影响构建"
+          fi
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
-
-      - name: Accept SDK licenses
-        run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --stacktrace
+
+      # 失败时把环境真相打出来，省去反复猜测日志的来回。
+      - name: Diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          echo "==== Java ===="
+          java -version 2>&1 || true
+          echo "==== Gradle ===="
+          ./gradlew --version 2>&1 || true
+          echo "==== SDK 目录 ===="
+          SDK='${{ steps.sdk.outputs.sdk_root }}'
+          echo "ANDROID_HOME=${ANDROID_HOME:-<empty>}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<empty>}"
+          echo "local.properties:"
+          cat local.properties 2>/dev/null || echo "  <不存在>"
+          echo "==== 已安装的 SDK 组件 ===="
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -name sdkmanager 2>/dev/null | head -n 1 || true)"
+          [ -n "$SDKMANAGER" ] && "$SDKMANAGER" --list_installed 2>/dev/null || echo "  <无法列出>"
+          echo "==== 平台目录 ===="
+          ls -1 "$SDK/platforms" 2>/dev/null || echo "  <无 platforms>"
+          ls -1 "$SDK/build-tools" 2>/dev/null || echo "  <无 build-tools>"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
